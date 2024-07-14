@@ -1,0 +1,32 @@
+---
+- name: AWX intance removal
+  hosts: localhost
+  tasks:
+    - name: Remove the AWX instance
+      kubernetes.core.k8s:
+        definition: "{{ lookup('kubernetes.core.kustomize', dir='./awx-instance') }}"
+        state: absent
+        context: minikube
+
+    - name: Remove the CRDs from the cluster
+      kubernetes.core.k8s:
+        definition: "{{ lookup('kubernetes.core.kustomize', dir='./awx-operator') }}"
+        state: absent
+        context: minikube
+      when: not keep_awx_crd
+
+    - name: Remove the HAProxy container
+      community.docker.docker_container:
+        name: awx_haproxy
+        state: absent
+
+    - name: Remove the PostgreSQL container
+      community.docker.docker_container:
+        name: awx_postgres
+        state: absent
+
+    - name: Remove the volume for the PostgreSQL container
+      community.docker.docker_volume:
+        name: awx_postgres
+        state: absent
+      when: not keep_postgresql_volume

@@ -1,0 +1,24 @@
+---
+# https://github.com/kurokobo/awx-on-k3s/blob/main/base/awx.yaml
+apiVersion: awx.ansible.com/v1beta1
+kind: AWX
+metadata:
+  name: awx-demo
+  namespace: awx
+spec:
+  # https://ansible.readthedocs.io/projects/awx-operator/en/latest/user-guide/admin-user-account-configuration.html
+  admin_user: admin
+  admin_password_secret: awx-admin-password
+
+  # https://ansible.readthedocs.io/projects/awx-operator/en/latest/user-guide/network-and-tls-configuration.html#ingress-type
+  service_type: ClusterIP
+
+  # https://ansible.readthedocs.io/projects/awx-operator/en/latest/user-guide/network-and-tls-configuration.html#ingress-type
+  ingress_type: ingress
+  ingress_api_version: networking.k8s.io/v1
+  ingress_class_name: nginx
+  ingress_path: /
+  ingress_path_type: Prefix
+
+  # https://ansible.readthedocs.io/projects/awx-operator/en/latest/user-guide/database-configuration.html#external-postgresql-service
+  postgres_configuration_secret: awx-postgres-configuration

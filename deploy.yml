@@ -1,0 +1,67 @@
+---
+- name: AWX instance deployment
+  hosts: localhost
+  vars:
+    ansible_connection: local
+  tasks:
+    - name: Create a volume for the PostgreSQL container
+      community.docker.docker_volume:
+        name: awx_postgres
+        state: present
+
+    - name: Create the PostgreSQL container
+      community.docker.docker_container:
+        name: awx_postgres
+        hostname: awx_postgres
+        image: postgres:16-alpine
+        state: started
+        shm_size: 128MB
+        env:
+          POSTGRES_USER: awx
+          POSTGRES_DB: awx
+          POSTGRES_PASSWORD: password
+        volumes:
+          - awx_postgres:/var/lib/postgresql
+        ports:
+          - 5435:5432
+
+    - name: Create a directory to store configuration files
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/build"
+        state: directory
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_gid }}"
+        mode: "0700"
+
+    - name: Generate the HAProxy configuration file
+      ansible.builtin.template:
+        src: haproxy.cfg.j2
+        dest: "{{ playbook_dir }}/build/haproxy.cfg"
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_gid }}"
+        mode: "0600"
+
+    - name: Create the HaProxy container
+      community.docker.docker_container:
+        name: awx_haproxy
+        hostname: awx_haproxy
+        image: haproxy:3.0-alpine
+        state: started
+        volumes:
+          - ./build/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+        ports:
+          - 8080:8080
+        networks:
+          - name: minikube
+
+    - name: Install the CRDs for AWX on the cluster
+      kubernetes.core.k8s:
+        definition: "{{ lookup('kubernetes.core.kustomize', dir='./awx-operator') }}"
+        state: present
+        context: minikube
+
+    - name: Deploy the AWX instance on the cluster
+      kubernetes.core.k8s:
+        definition: "{{ lookup('kubernetes.core.kustomize', dir='./awx-instance') }}"
+        state: present
+        context: minikube

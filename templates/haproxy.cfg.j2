@@ -1,0 +1,15 @@
+
+defaults
+  mode http
+  timeout client 10s
+  timeout connect 5s
+  timeout server 10s
+  timeout http-request 10s
+  log global
+
+frontend awx
+    bind *:8080
+    default_backend minikube
+
+backend minikube
+    server node1 {{ minikube_node_ip }}:80

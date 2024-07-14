@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: awx
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+secretGenerator:
+  - name: awx-admin-password
+    type: Opaque
+    literals:
+      - password=Pa$$word
+
+  - name: awx-postgres-configuration
+    type: Opaque
+    literals:
+      # https://minikube.sigs.k8s.io/docs/handbook/host-access/
+      - host=host.minikube.internal
+      - port=5435
+      - database=awx
+      - username=awx
+      - password=password
+      - sslmode=prefer
+      - target_session_attrs=read-write
+      - type=unmanaged
+  
+resources:
+  - awx.yml
