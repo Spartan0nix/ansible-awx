@@ -1,0 +1,57 @@
+---
+- name: NFS | Include os specific informations
+  ansible.builtin.include_vars: "{{ ansible_os_family | lower }}.yml"
+
+- name: NFS | Install requirements # noqa: package-latest
+  ansible.builtin.package:
+    name: "{{ nfs_packages }}"
+    state: latest
+  become: true
+
+- name: NFS | Create the NFS directories
+  ansible.builtin.file:
+    path: "{{ share.path }}"
+    state: directory
+    owner: "{{ share.owner }}"
+    group: "{{ share.group }}"
+    mode: "0770"
+  become: true
+  loop: "{{ nfs_shares }}"
+  loop_control:
+    loop_var: share
+
+- name: NFS | Enable the service
+  ansible.builtin.service:
+    name: nfs-server
+    state: started
+    enabled: true
+  become: true
+
+- name: NFS | Generate the export configuration
+  ansible.builtin.template:
+    src: awx.exports.j2
+    dest: /etc/exports.d/awx.exports
+    owner: root
+    group: root
+    mode: "0640"
+    backup: true
+    lstrip_blocks: true
+  become: true
+  notify:
+    - "NFS | Restart the service"
+
+# useradd --no-create-home --uid 2000 --user-group nfs
+# chown -R 2000:2000 /srv/nfs/awx-projects/
+
+# https://github.com/kubernetes-csi/csi-driver-nfs/blob/master/deploy/example/README.md
+
+# https://stackoverflow.com/questions/48534980/mount-local-directory-into-pod-in-minikube
+
+# http://pietervogelaar.nl/minikube-nfs-mounts
+
+# https://matthewpalmer.net/kubernetes-app-developer/articles/kubernetes-volumes-example-nfs-persistent-volume.html
+
+# ---
+# Option 1: minikube ssh -> montage des partages NFS sur la VM minikube et utilisation d'un persistentVolume local
+# Option 2: csi-driver-nfs -> normalement restriction sur IP de la machine Minikube
+# ---

@@ -1,0 +1,46 @@
+all:
+  vars:
+    ansible_python_interpreter: /bin/python3
+  children:
+    servers:
+      hosts:
+        <hostname>:
+          # ---
+          ansible_host: 192.168.0.1
+          ansible_user: myuser
+          ansible_password: !vault |
+            [...]
+          ansible_become_user: root
+          ansible_become_password: !vault |
+            [...]
+          ansible_become_method: su
+          # ---
+          storage_device_path: /dev/sdb
+          storage_partition_name: sdb1
+          # ---
+          nfs_shares:
+            - path: /nfs/postgresql
+              owner: postgres
+              group: root
+              allowed_hosts:
+                - "{{ minikube_node_ip }}"
+            - path: /nfs/projects
+              owner: 1000
+              group: root
+              allowed_hosts:
+                - "{{ minikube_node_ip }}"
+          # ---
+          minikube_node_ip: 192.168.49.1
+          minikube_csi_driver_nfs_version: "v4.8.0"  
+          # ---
+          awx_operator_version: 2.19.1
+          awx_nfs_server: "{{ ansible_host }}"
+          awx_nfs_shares:
+            - name: postgresql
+              path: /nfs/postgresql
+            - name: projects
+              path: /nfs/projects
+          awx_admin_password: !vault |
+            [...]
+          awx_minikube_node_ip: "{{ minikube_node_ip }}"
+          awx_certificate_common_name: awx.example.com

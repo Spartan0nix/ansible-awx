@@ -3,6 +3,6 @@ kind: Kustomization
 namespace: awx
 images:
   - name: quay.io/ansible/awx-operator
-    newTag: 2.19.1
+    newTag: {{ awx_operator_version }}
 resources:
-  - github.com/ansible/awx-operator/config/default?ref=2.19.1
+  - github.com/ansible/awx-operator/config/default?ref={{ awx_operator_version }}

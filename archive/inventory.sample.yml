@@ -1,0 +1,13 @@
+all:
+  children:
+    servers:
+      <hostname>:
+        # ---
+        server_network_interfaces: # Define the configuration to apply on each network interface of the server.
+          - name: # Name of the network interface to configure.
+            type: # Type of interface to configure (static | dhcp).
+            address: # Static IP address of the server following the CIDR notation (<ip>/<subnet>), required if type == 'static'.
+        # ---
+        users:
+          awx_password: # encrypted password for the 'awx' user obtain after using the `make encrypt-passwords` command.
+          root_password: # encrypted password for the 'root' user obtain after using the `make encrypt-passwords` command.

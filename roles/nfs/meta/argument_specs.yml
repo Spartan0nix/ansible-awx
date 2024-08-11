@@ -1,0 +1,30 @@
+argument_specs:
+  main:
+    short_description: Initialize the NFS storage shares
+    description: Initialize the NFS storage shares
+    author:
+      - Léo HUMBLOT
+    options:
+      nfs_shares:
+        type: list
+        elements: dict
+        required: true
+        description: Path the local block storage device.
+        options:
+          path:
+            type: str
+            required: true
+            description: Absolute path to the NFS directory.
+          owner:
+            type: str
+            required: true
+            description: Owner of the NFS directory.
+          group:
+            type: str
+            required: true
+            description: Group associated to the NFS directory.
+          allowed_hosts:
+            type: list
+            elements: str
+            required: true
+            description: A list of hosts (host ip, fdqn, ip range, netgroup) allowed to access the NFS share

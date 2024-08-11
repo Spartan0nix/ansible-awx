@@ -1,0 +1,14 @@
+argument_specs:
+  main:
+    short_description: Deploy and configure a Kubernetes cluster
+    description:
+      - Deploy and configure a Kubernetes cluster using Minikube
+      - 'Tools deployed: csi-driver-nfs'
+    author:
+      - Léo HUMBLOT
+    options:
+      minikube_csi_driver_nfs_version:
+        type: str
+        required: false
+        default: latest
+        description: Version of the 'csi-driver-nfs' to deploy using Helm

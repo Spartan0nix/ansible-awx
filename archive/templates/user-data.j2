@@ -1,0 +1,35 @@
+#cloud-config
+# Packages configuration
+package_reboot_if_required: true
+package_update: true
+package_upgrade: true
+packages:
+  - python3
+  - open-vm-tools
+# Host configuration
+preserve_hostname: false
+hostname: {{ inventory_hostname }}
+create_hostname_file: true
+manage_etc_hosts: true
+# Locales configuration
+locale: en_US.UTF-8
+timezone: Europe/Paris
+# Users configuration
+# https://cloudinit.readthedocs.io/en/latest/reference/modules.html#users-and-groups
+# mkpasswd --method=SHA-512 --rounds=50000
+users:
+  - name: awx
+    lock_passwd: false
+    shell: /bin/bash
+    hashed_passwd: {{ users.awx_password | string | password_hash(hashtype='sha512', rounds=50000) }}
+    sudo: null
+  - name: root
+    lock_passwd: false
+    shell: /bin/bash
+    hashed_passwd: {{ users.root_password | string | password_hash(hashtype='sha512', rounds=50000) }}
+# SSH configuration
+ssh_pwauth: true # Enable SSH password access
+ssh_deletekeys: true # Remove the default host keys
+ssh_genkeytypes: [rsa, ecdsa, ed25519] # Generate new host keys
+runcmd:
+  - localectl set-keymap fr-azerty

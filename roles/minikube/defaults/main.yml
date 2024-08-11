@@ -1,0 +1,2 @@
+---
+minikube_csi_driver_nfs_version: latest

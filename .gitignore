@@ -1,3 +1,4 @@
-build/
+_build/
 .vscode/
-group_vars/all.yml
+inventory.yml
+Makefile.local

@@ -1,0 +1,82 @@
+---
+- name: STORAGE | Install requirements # noqa: package-latest
+  ansible.builtin.package:
+    name:
+      - lvm2
+      - parted
+    state: latest
+  become: true
+
+- name: STORAGE | Add a GTP parition to the block device
+  community.general.parted:
+    device: "{{ storage_device_path }}"
+    name: "{{ storage_partition_name }}"
+    state: present
+    number: 1
+    label: gpt
+  become: true
+  register: block_device
+
+- name: STORAGE | Create a volume group
+  community.general.lvg:
+    vg: awx
+    pvs: "/dev/{{ storage_partition_name }}"
+    pvresize: true
+  become: true
+
+- name: STORAGE | Create the logical volumes
+  community.general.lvol:
+    vg: awx
+    lv: "{{ volume.name }}"
+    size: "{{ volume.size }}"
+    active: true
+  become: true
+  loop_control:
+    loop_var: volume
+  loop:
+    - name: docker
+      size: 60%VG
+    - name: nfs
+      size: 40%VG
+
+- name: STORAGE | Create the ext4 filesystem on the logical volumes
+  community.general.filesystem:
+    dev: "/dev/mapper/awx-{{ volume }}"
+    fstype: ext4
+    state: present
+  become: true
+  loop_control:
+    loop_var: volume
+  loop:
+    - docker
+    - nfs
+
+- name: STORAGE | Create the mount folders
+  ansible.builtin.file:
+    path: "{{ mountpoint }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  become: true
+  loop_control:
+    loop_var: mountpoint
+  loop:
+    - /var/lib/docker
+    - /srv/nfs/
+
+- name: STORAGE | Mount the lvm mappers
+  ansible.posix.mount:
+    src: "{{ mountpoint.src }}"
+    path: "{{ mountpoint.path }}"
+    boot: true
+    fstype: ext4
+    state: mounted
+  become: true
+  loop_control:
+    loop_var: mountpoint
+  loop:
+    - src: /dev/mapper/awx-docker
+      path: /var/lib/docker
+    - src: /dev/mapper/awx-nfs
+      path: /srv/nfs

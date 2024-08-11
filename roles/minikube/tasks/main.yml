@@ -1,0 +1,59 @@
+---
+- name: MINIKUBE | Setup minikube
+  ansible.builtin.include_tasks: minikube.yml
+
+- name: MINIKUBE | Check the cluster status
+  ansible.builtin.command: minikube status --output='json'
+  register: minikube_status
+  changed_when: false
+  failed_when:
+    # 1 (minikube NOK)
+    # 2 (cluster NOK)
+    # 4 (Kubernetes NOK)
+    # 7 (all the aboves)
+    # 85 (profile missing)
+    - minikube_status.rc not in [0, 1, 2, 4, 7, 85]
+    - >-
+      "minikube start" not in minikube_status.stdout
+      or "Stopped" not in minikube_status.stdout
+
+- name: MINIKUBE | Start the cluster
+  ansible.builtin.command: >-
+    minikube start
+    --cache-images=true
+    --static-ip="{{ minikube_node_ip }}"
+  register: minikube_start
+  changed_when: minikube_start.rc == 0
+  failed_when: minikube_start.rc != 0
+  when:
+    - minikube_status.rc in [1, 2, 4, 7, 85]
+    - >-
+      "minikube start" in minikube_status.stdout
+      or "Stopped" in minikube_status.stdout
+
+- name: MINIKUBE | Add the 'csi-driver-nfs' repo
+  kubernetes.core.helm_repository:
+    name: csi-driver-nfs
+    repo_url: 'https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts'
+    context: minikube
+
+- name: MINIKUBE | Deploy the specified version of the 'csi-driver-nfs' chart
+  kubernetes.core.helm:
+    name: csi-driver-nfs
+    chart_ref: 'csi-driver-nfs/csi-driver-nfs'
+    release_namespace: kube-system
+    chart_version: "{{ minikube_csi_driver_nfs_version }}"
+    context: minikube
+
+- name: MINIKUBE | Retrieve the list of minikube addons
+  ansible.builtin.command: minikube addons list --output=json
+  register: minikube_addons
+  changed_when: false
+  failed_when: minikube_addons.rc != 0
+
+- name: MINIKUBE | Enable the 'ingress' addon
+  ansible.builtin.command: minikube addons enable ingress
+  register: minikube_ingress_status
+  changed_when: minikube_ingress_status.rc == 0
+  failed_when: minikube_ingress_status.rc != 0
+  when: (minikube_addons.stdout | from_json).ingress.Status != "enabled"

@@ -1,0 +1,14 @@
+version: 1
+config:
+  {% for interface in server_network_interfaces %}
+  - type: physical
+    name: {{ interface.name }}
+    {% if interface.type == 'static' %}
+    subnets:
+      - type: static
+        address: {{ interface.address }}
+    {% else %}
+    subnets:
+      - type: dhcp
+    {% endif %}
+  {% endfor %}

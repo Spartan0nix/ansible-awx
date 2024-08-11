@@ -1,0 +1,15 @@
+argument_specs:
+  main:
+    short_description: Initialize the local storage device used for Docker and NFS exports
+    description: Initialize the local storage device used for Docker and NFS exports
+    author:
+      - Léo HUMBLOT
+    options:
+      storage_device_path:
+        type: str
+        required: true
+        description: Path the local block storage device
+      storage_partition_name:
+        type: str
+        required: true
+        description: Name of the partition to create an the block storage device

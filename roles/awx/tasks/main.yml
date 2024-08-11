@@ -1,0 +1,204 @@
+---
+- name: AWX | Install system requirements # noqa: package-latest
+  ansible.builtin.package:
+    name:
+      - python3-pip
+    state: latest
+  become: true
+
+- name: AWX | Install pip requirements # noqa: package-latest
+  ansible.builtin.pip:
+    name:
+      - kubernetes
+      - firewall
+    state: latest
+
+- name: AWX | Create a directory to store configuration manifest
+  ansible.builtin.file:
+    path: "{{ playbook_dir }}/{{ directory }}"
+    state: directory
+    owner: "{{ ansible_user_uid }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0700"
+  loop_control:
+    loop_var: directory
+  loop:
+    - _build
+    - _build/operator
+    - _build/instance
+  delegate_to: 127.0.0.1
+
+- name: AWX | Generate the AWX operator kustomize manifest
+  ansible.builtin.template:
+    src: operator-kustomization.yaml.j2
+    dest: "{{ playbook_dir }}/_build/operator/kustomization.yaml"
+    owner: "{{ ansible_user_uid }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0600"
+  delegate_to: 127.0.0.1
+
+- name: AWX | Deploy the AWX operator
+  kubernetes.core.k8s:
+    definition: "{{ lookup('kubernetes.core.kustomize', dir=playbook_dir + '/_build/operator') }}"
+    state: present
+    context: minikube
+
+- name: AWX | Create a directory to store TLS components
+  ansible.builtin.file:
+    path: "{{ directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  become: true
+  loop_control:
+    loop_var: directory
+  loop:
+    - /etc/awx
+    - /etc/awx/certs
+
+- name: AWX | Generate a private key
+  community.crypto.openssl_privatekey:
+    path: /etc/awx/certs/key.pem
+    state: present
+    owner: root
+    group: root
+    mode: "0600"
+    size: 4096
+    type: RSA
+  become: true
+
+- name: AWX | Generate a certificate signing request (CSR)
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: /etc/awx/certs/key.pem
+    common_name: "{{ awx_certificate_common_name }}"
+  register: awx_csr
+  changed_when: false
+  become: true
+
+- name: AWX | Generate the self-signed certificate
+  community.crypto.x509_certificate:
+    path: /etc/awx/certs/cert.pem
+    csr_content: "{{ awx_csr.csr }}"
+    privatekey_path: /etc/awx/certs/key.pem
+    provider: selfsigned
+  become: true
+
+- name: AWX | Create a Kubernetes StorageClass for each NFS share
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: "awx-storage-class-nfs-{{ share.name }}"
+      provisioner: nfs.csi.k8s.io
+      parameters:
+        server: "{{ awx_nfs_server }}"
+        share: "{{ share.path }}"
+        mountPermissions: "0777"
+        onDelete: retain # Keep the content of the NFS directory
+      reclaimPolicy: Delete
+      volumeBindingMode: Immediate
+      mountOptions:
+        - nfsvers=4.1
+    state: present
+    context: minikube
+  loop_control:
+    loop_var: share
+  loop: "{{ awx_nfs_shares }}"
+
+- name: AWX | Create a Kubernetes secret for the password of the 'admin' user
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: awx-admin-password
+        namespace: awx
+      stringData:
+        password: "{{ awx_admin_password }}"
+
+- name: AWX | Retrieve the HTTPS certificate key value
+  ansible.builtin.slurp:
+    src: /etc/awx/certs/key.pem
+  register: awx_cert_key
+  become: true
+
+- name: AWX | Retrieve the HTTPS certificate value
+  ansible.builtin.slurp:
+    src: /etc/awx/certs/cert.pem
+  register: awx_cert
+  become: true
+
+- name: AWX | Store the HTTPS certificate in a Kubernetes secret
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: awx-https-certificate
+        namespace: awx
+      type: kubernetes.io/tls
+      data:
+        tls.crt: "{{ awx_cert.content }}"
+        tls.key: "{{ awx_cert_key.content }}"
+
+- name: Deploy the AWX instance
+  kubernetes.core.k8s:
+    definition:
+      # https://github.com/kurokobo/awx-on-k3s/blob/main/base/awx.yaml
+      apiVersion: awx.ansible.com/v1beta1
+      kind: AWX
+      metadata:
+        name: awx
+        namespace: awx
+      spec:
+        # https://ansible.readthedocs.io/projects/awx-operator/en/latest/user-guide/admin-user-account-configuration.html
+        admin_user: admin
+        admin_password_secret: awx-admin-password
+
+        # https://ansible.readthedocs.io/projects/awx-operator/en/latest/user-guide/network-and-tls-configuration.html#service-type
+        service_type: ClusterIP
+
+        # https://ansible.readthedocs.io/projects/awx-operator/en/latest/user-guide/network-and-tls-configuration.html#ingress-type
+        ingress_type: ingress
+        ingress_api_version: networking.k8s.io/v1
+        ingress_class_name: nginx
+        ingress_path: /
+        ingress_path_type: Prefix
+        ingress_hosts:
+          - hostname: "{{ awx_certificate_common_name }}"
+            tls_secret: awx-https-certificate
+
+        # https://ansible.readthedocs.io/projects/awx-operator/en/latest/user-guide/database-configuration.html#external-postgresql-service
+        postgres_storage_class: >-
+          {{
+            'awx-storage-class-nfs-postgresql'
+            if ('postgresql' in nfs_shares_name)
+            else ''
+          }}
+
+        # https://ansible.readthedocs.io/projects/awx-operator/en/latest/user-guide/advanced-configuration/persisting-projects-directory.html
+        projects_persistence: true
+        projects_storage_class: >-
+          {{
+            'awx-storage-class-nfs-projects'
+            if (
+              'projects' in nfs_shares_name or 'awx-projects' in nfs_shares_name
+            )
+            else ''
+          }}
+    state: present
+    context: minikube
+  vars:
+    nfs_shares_name: "{{ awx_nfs_shares | map(attribute='name') | flatten }}"
+
+- name: AWX | Gather the package facts
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: AWX | Configure a port-forward with firewalld
+  ansible.builtin.include_tasks: firewalld.yml
+  when: >-
+    "firewalld" in ansible_facts.packages
+    and ansible_facts.packages.firewalld | length > 0

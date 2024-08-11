@@ -1,0 +1,50 @@
+argument_specs:
+  main:
+    short_description: Deploy and configure an AWX instance in a Kubernetes cluster
+    description: Deploy and configure an AWX instance in a Kubernetes cluster
+    author:
+      - Léo HUMBLOT
+    options:
+      awx_operator_version:
+        type: str
+        required: true
+        description:
+          - Version of the AWX operator to deploy
+          - https://github.com/ansible/awx-operator/releases
+
+      awx_nfs_server:
+        type: str
+        required: true
+        description: IP / DNS of the NFS server used to externalise the storage.
+
+      awx_nfs_shares:
+        type: list
+        elements: dict
+        required: true
+        description: List of the NFS shares used.
+        options:
+          name:
+            type: str
+            required: true
+            description:
+              - Name associated to the share.
+              - Used as suffix when creating ressources.
+          path:
+            type: str
+            required: true
+            description: Path used to mount the NFS share.
+
+      awx_admin_password:
+        type: str
+        required: true
+        description: Password of the 'admin' user.
+
+      awx_minikube_node_ip:
+        type: str
+        required: true
+        description: IP of the minikube node.
+
+      awx_certificate_common_name:
+        type: str
+        required: true
+        description: Common name (CN) used for the certificate.

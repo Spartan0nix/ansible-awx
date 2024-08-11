@@ -1,0 +1,25 @@
+---
+- name: MINIKUBE | Gather package facts
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: MINIKUBE | Retrieve the latest version of Minikube
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/kubernetes/minikube/releases/latest
+    return_content: true
+    headers:
+      Accept: 'application/vnd.github+json'
+  delegate_to: 127.0.0.1
+  register: minikube_latest_release
+
+- name: MINIKUBE | Extract the Minikube version
+  ansible.builtin.set_fact:
+    minikube_latest_version: "{{ minikube_latest_release.json.tag_name | replace('v', '') }}"
+
+- name: MINIKUBE | Install Minikube (rhel)
+  ansible.builtin.include_tasks: minikube_rhel.yml
+  when:
+    - ansible_os_family == "RedHat"
+    - >-
+      "minikube" not in ansible_facts.packages
+      or ansible_facts.packages.minikube[0].version != minikube_latest_version

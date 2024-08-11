@@ -1,0 +1,30 @@
+---
+- name: DOCKER | Setup the custom repository (rhel)
+  ansible.builtin.include_tasks: rhel.yml
+  when: ansible_os_family == "RedHat"
+
+- name: DOCKER | Install packages # noqa: package-latest
+  ansible.builtin.package:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: latest
+  become: true
+
+- name: DOCKER | Enable services
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  become: true
+
+- name: DOCKER | Add the 'awx' user to the docker group
+  ansible.builtin.user:
+    name: awx
+    append: true
+    groups:
+      - docker
+  become: true

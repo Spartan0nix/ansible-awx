@@ -1,7 +1,0 @@
----
-ansible_connection: local
-# ---
-minikube_node_ip: "" # IP address of the minikube node (can be obtain using `minikube ip` command)
-# ---
-keep_awx_crd: true | false # If false, remove the AWX CRDs during the execution of the `destroy.yml`playbook
-keep_postgresql_volume: true | false # If false, remove the docker PostgreSQL volume during the execution of the `destroy.yml`playbook

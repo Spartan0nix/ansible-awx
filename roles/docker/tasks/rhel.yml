@@ -1,0 +1,12 @@
+---
+- name: DOCKER | Install requirements # noqa: package-latest
+  ansible.builtin.dnf:
+    name: yum-utils
+    state: latest
+  become: true
+
+- name: DOCKER | Add the YUM repository
+  ansible.builtin.command: yum-config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+  args:
+    creates: /etc/yum.repos.d/docker-ce.repo
+  become: true

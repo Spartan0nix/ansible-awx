@@ -1,0 +1,41 @@
+# https://docs.vmware.com/en/VMware-SD-WAN/6.0/sd-wan-orchestrator-deployment-and-monitoring-guide/GUID-46F3C13D-038E-4C92-B639-864B516AE663.html
+# https://cloudinit.readthedocs.io/en/latest/reference/datasources/nocloud.html
+# https://cloudinit.readthedocs.io/en/latest/reference/modules.html#users-and-groups
+# https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/8/html/configuring_and_managing_cloud-init_for_rhel_8/configuring-cloud-init_cloud-content
+- name: Build the 'cloud-init' ISO file
+  hosts: servers
+  vars:
+    ansible_connection: local
+  tasks:
+    - name: Create a directory to store the output files
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/build"
+        state: directory
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_gid }}"
+        mode: "0700"
+
+    - name: Build the manifest files
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "{{ playbook_dir }}/build/{{ item }}"
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_gid }}"
+        mode: "0600"
+        lstrip_blocks: true
+      loop:
+        - meta-data
+        - user-data
+        - network-config
+
+    - name: Build the ISO file
+      community.general.iso_create:
+        src_files:
+          - "{{ playbook_dir }}/build/meta-data"
+          - "{{ playbook_dir }}/build/user-data"
+          - "{{ playbook_dir }}/build/network-config"
+        dest_iso: "{{ playbook_dir }}/build/awx_cloud_init.iso"
+        joliet: 3
+        rock_ridge: 1.12
+        interchange_level: 4
+        vol_ident: cidata

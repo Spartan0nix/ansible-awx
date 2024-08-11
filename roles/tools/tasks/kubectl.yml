@@ -1,0 +1,32 @@
+---
+- name: TOOLS | Retrieve the current Kubernetes stable version
+  ansible.builtin.uri:
+    url: https://dl.k8s.io/release/stable.txt
+    return_content: true
+  delegate_to: 127.0.0.1
+  register: kubernetes_raw_version
+
+- name: TOOLS | Extract the Kubernetes version
+  ansible.builtin.set_fact:
+    kubernetes_stable_version: "{{ splited_version[0] + '.' + splited_version[1] }}"
+  vars:
+    splited_version: "{{ kubernetes_raw_version.content | split('.') }}"
+
+- name: TOOLS | Configure the Kubernetes repository (RHEL)
+  ansible.builtin.yum_repository:
+    name: Kubernetes
+    file: kubernetes
+    description: ""
+    baseurl: "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_stable_version }}/rpm/"
+    enabled: true
+    gpgcheck: true
+    gpgkey: "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_stable_version }}/rpm/repodata/repomd.xml.key"
+  become: true
+  when: ansible_os_family == "RedHat"
+
+- name: TOOLS | Install kubectl # noqa: package-latest
+  ansible.builtin.package:
+    name:
+      - kubectl
+    state: latest
+  become: true

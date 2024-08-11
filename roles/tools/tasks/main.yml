@@ -1,0 +1,6 @@
+---
+- name: TOOLS | Install kubectl
+  ansible.builtin.include_tasks: kubectl.yml
+
+- name: TOOLS | Setup helm
+  ansible.builtin.include_tasks: helm.yml

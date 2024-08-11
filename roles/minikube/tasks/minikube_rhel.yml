@@ -1,0 +1,20 @@
+---
+- name: MINIKUBE | Retrieve the RPM package
+  ansible.builtin.get_url:
+    url: https://storage.googleapis.com/minikube/releases/latest/minikube-latest.x86_64.rpm
+    dest: /tmp/minikube-latest.x86_64.rpm
+    mode: "0640"
+    owner: "{{ ansible_user_uid }}"
+    group: "{{ ansible_user_gid }}"
+
+- name: MINIKUBE | Install the RPM package # noqa: package-latest
+  ansible.builtin.dnf:
+    name: /tmp/minikube-latest.x86_64.rpm
+    state: latest
+    disable_gpg_check: true
+  become: true
+
+- name: MINIKUBE | Remove the RPM package
+  ansible.builtin.file:
+    path: /tmp/minikube-latest.x86_64.rpm
+    state: absent

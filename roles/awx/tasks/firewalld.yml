@@ -1,0 +1,31 @@
+---
+- name: AWX | Enable the 'https' service
+  ansible.posix.firewalld:
+    zone: public
+    state: enabled
+    permanent: true
+    immediate: true
+    service: https
+  become: true
+
+- name: AWX | Enable IP masquerade
+  ansible.posix.firewalld:
+    zone: public
+    masquerade: true
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+
+- name: AWX | Add a new port-forwarding rule
+  ansible.posix.firewalld:
+    zone: public
+    state: enabled
+    permanent: true
+    immediate: true
+    port_forward:
+      - port: 443
+        proto: tcp
+        toaddr: "{{ awx_minikube_node_ip }}"
+        toport: 443
+  become: true

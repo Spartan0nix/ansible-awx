@@ -1,0 +1,79 @@
+---
+- name: TOOLS | Check if helm is installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/helm
+  register: helm_install
+
+- name: TOOLS | Retrieve the version of helm installed
+  ansible.builtin.command: helm version --short
+  register: helm_current_version
+  changed_when: helm_current_version.rc != 0
+  failed_when: helm_current_version.rc != 0
+  when: helm_install.stat.exists
+
+- name: TOOLS | Retrieve the latest release of helm
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/helm/helm/releases/latest
+    return_content: true
+    headers:
+      Accept: 'application/vnd.github+json'
+  delegate_to: 127.0.0.1
+  register: helm_latest_release
+
+- name: TOOLS | Extract the latest version of helm
+  ansible.builtin.set_fact:
+    helm_latest_version: "{{ helm_latest_release.json.tag_name | replace('v', '') }}"
+
+- name: TOOLS | Retrieve the archive
+  ansible.builtin.get_url:
+    url: "{{ helm_asset_url }}"
+    dest: "/tmp/helm-v{{ helm_latest_version }}-linux-amd64.tar.gz"
+    checksum: "sha256:{{ helm_checksum_url }}"
+    owner: "{{ ansible_user_uid }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0700"
+  vars:
+    helm_asset_url: "https://get.helm.sh/helm-v{{ helm_latest_version }}-linux-amd64.tar.gz"
+    helm_checksum_url: "https://get.helm.sh/helm-v{{ helm_latest_version }}-linux-amd64.tar.gz.sha256"
+  when: >-
+    not helm_install.stat.exists or
+    helm_latest_version not in helm_current_version.stdout
+
+- name: TOOLS | Extract the archive
+  ansible.builtin.unarchive:
+    src: "/tmp/helm-v{{ helm_latest_version }}-linux-amd64.tar.gz"
+    remote_src: true
+    dest: /tmp
+    owner: "{{ ansible_user_uid }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0700"
+    creates: /tmp/linux-amd64
+  when: >-
+    not helm_install.stat.exists or
+    helm_latest_version not in helm_current_version.stdout
+
+- name: TOOLS | Copy the binairy to '/usr/local/bin'
+  ansible.builtin.copy:
+    src: /tmp/linux-amd64/helm
+    remote_src: true
+    dest: /usr/local/bin/helm
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  when: >-
+    not helm_install.stat.exists or
+    helm_latest_version not in helm_current_version.stdout
+
+- name: TOOLS | Cleanup temporary files
+  ansible.builtin.file:
+    path: "{{ element }}"
+    state: absent
+  loop:
+    - "/tmp/helm-v{{ helm_latest_version }}-linux-amd64.tar.gz"
+    - /tmp/linux-amd64
+  loop_control:
+    loop_var: element
+  when: >-
+    not helm_install.stat.exists or
+    helm_latest_version not in helm_current_version.stdout
